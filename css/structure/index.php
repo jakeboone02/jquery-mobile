@@ -1,5 +1,5 @@
 <?php
-$files = array_merge($files, array(
+$files = array_merge(array(
 	'../../../LICENSE-INFO.txt',
 	'../../structure/jquery.mobile.core.css',
 	'../../structure/jquery.mobile.transitions.css',
@@ -16,7 +16,7 @@ $files = array_merge($files, array(
 	'../../structure/jquery.mobile.forms.textinput.css',
 	'../../structure/jquery.mobile.listview.css',
 	'../../structure/jquery.mobile.forms.slider.css'
-));
+), $files);
 
 require_once($base.'/../../../combine.php');
 
