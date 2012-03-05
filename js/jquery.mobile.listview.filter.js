@@ -16,10 +16,30 @@ $.mobile.listview.prototype.options.filterCallback = function( text, searchValue
 $( document ).delegate( ":jqmData(role='listview')", "listviewcreate", function() {
 
 	var list = $( this ),
-		listview = list.data( "listview" );
+		listview = list.data( "listview" ),
+		filterIndex = [],
+		dividerIndex = {},
+		listIsDynamic = list.jqmData( "dynamic" ) == true;
 
 	if ( !listview.options.filter ) {
 		return;
+	}
+
+	// Cache the filter text if the list is not dynamic
+	if ( !listIsDynamic ) {
+
+		list.children().each(function(i, v) {
+
+			var item = $( this );
+
+			if ( item.is( "li:jqmData(role=list-divider)" ) ) {
+
+				dividerIndex[ i ] = true;
+			} else {
+
+				filterIndex[ i ] = item.jqmData( "filtertext" ) || item.text();
+			}
+		});
 	}
 
 	var wrapper = $( "<form>", {
@@ -39,16 +59,18 @@ $( document ).delegate( ":jqmData(role='listview')", "listviewcreate", function(
 				lastval = $this.jqmData( "lastval" ) + "",
 				childItems = false,
 				itemtext = "",
-				item;
+				item,
+				hideQueue = [];
 
 			// Change val as lastval for next execution
 			$this.jqmData( "lastval" , val );
-			if ( val.length < lastval.length || val.indexOf(lastval) !== 0 ) {
+			if ( !listIsDynamic || val.length < lastval.length || val.indexOf(lastval) !== 0 ) {
 
-				// Removed chars or pasted something totally different, check all items
+				// Check all items if the list is not dynamic or if the user removed
+				// characters or pasted something totally different
 				listItems = list.children();
 			} else {
-
+            
 				// Only chars added, not removed, only use visible subset
 				listItems = list.children( ":not(.ui-screen-hidden)" );
 			}
@@ -56,27 +78,57 @@ $( document ).delegate( ":jqmData(role='listview')", "listviewcreate", function(
 			if ( val ) {
 
 				// This handles hiding regular rows without the text we search for
-				// and any list dividers without regular rows shown under it
+				// and any list dividers without regular rows shown under it.  If
+				// the list is not dynamic, we can search the cached filter values
+				// instead of accessing the DOM elements.
 
-				for ( var i = listItems.length - 1; i >= 0; i-- ) {
-					item = $( listItems[ i ] );
-					itemtext = item.jqmData( "filtertext" ) || item.text();
+				if ( !listIsDynamic ) {
 
-					if ( item.is( "li:jqmData(role=list-divider)" ) ) {
+					for ( var i = filterIndex.length - 1; i >= 0; i-- ) {
 
-						item.toggleClass( "ui-filter-hidequeue" , !childItems );
+						if ( dividerIndex[ i ] ) {
 
-						// New bucket!
-						childItems = false;
+							if ( !childItems ) {
 
-					} else if ( listview.options.filterCallback( itemtext, val ) ) {
+								hideQueue.push( i );
+							}
 
-						//mark to be hidden
-						item.toggleClass( "ui-filter-hidequeue" , true );
-					} else {
+							childItems = false;
+						} else if ( listview.options.filterCallback( filterIndex[ i ], val ) ) {
 
-						// There's a shown item in the bucket
-						childItems = true;
+							hideQueue.push( i );
+						} else {
+
+							childItems = true;
+						}
+					}
+
+					for ( var h = 0, hl = hideQueue.length; h < hl; h++ ) {
+
+						listItems.eq( hideQueue[ h ] ).toggleClass( "ui-filter-hidequeue", true );
+					}
+				} else {
+
+					for ( var i = listItems.length - 1; i >= 0; i-- ) {
+						item = $( listItems[ i ] );
+						itemtext = item.jqmData( "filtertext" ) || item.text();
+
+						if ( item.is( "li:jqmData(role=list-divider)" ) ) {
+
+							item.toggleClass( "ui-filter-hidequeue" , !childItems );
+
+							// New bucket!
+							childItems = false;
+
+						} else if ( listview.options.filterCallback( itemtext, val ) ) {
+
+							//mark to be hidden
+							item.toggleClass( "ui-filter-hidequeue" , true );
+						} else {
+
+							// There's a shown item in the bucket
+							childItems = true;
+						}
 					}
 				}
 
@@ -90,6 +142,8 @@ $( document ).delegate( ":jqmData(role='listview')", "listviewcreate", function(
 					.filter( ".ui-filter-hidequeue" )
 					.toggleClass( "ui-screen-hidden", true )
 					.toggleClass( "ui-filter-hidequeue", false );
+
+				hideQueue = [];
 
 			} else {
 
